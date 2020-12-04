@@ -1,3 +1,5 @@
+#![allow(clippy::ptr_arg)]
+
 aoc_helper::main!(2020 => 
     // day1,
     // day2,
