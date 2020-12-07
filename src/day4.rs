@@ -9,7 +9,11 @@ pub fn input_generator(input: &str) -> Input {
             passport
                 .split_whitespace()
                 .map(|s| s.split(':').collect_tuple().expect("Invalid input"))
-                .collect()
+                .fold(HashMap::new(), |mut acc, (k, v)| {
+                    if acc.capacity() == 0 { acc.reserve(8) }
+                    acc.insert(k, v);
+                    acc
+                })
         })
         .collect()
 }
