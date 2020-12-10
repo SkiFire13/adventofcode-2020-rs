@@ -21,7 +21,7 @@ pub fn part1(input: &Input) -> usize {
         match j2 - j1 {
             1 => count1 += 1,
             3 => count3 += 1,
-            _ => panic!("Invalid input"),
+            _ => {}
         }
     }
 
@@ -36,8 +36,9 @@ pub fn part2(input: &Input) -> usize {
     for (&j1, &j2) in joltages.iter().zip(joltages.iter().skip(1)) {
         cmbs = match j2 - j1 {
             1 => [cmbs[1], cmbs[2], cmbs[0] + cmbs[1] + cmbs[2]],
+            2 => [cmbs[2], 0, cmbs[1] + cmbs[2]],
             3 => [0, 0, cmbs[2]],
-            _ => panic!("Invalid input"),
+            _ => [0, 0, 0],
         };
     }
 
