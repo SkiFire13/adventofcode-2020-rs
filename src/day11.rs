@@ -68,14 +68,14 @@ impl Bounds {
 
     fn add_point(&mut self, (x, y): (usize, usize)) {
         let (x, y) = (x as isize, y as isize);
-        self.min_x = min(self.min_x, x - 1);
-        self.max_x = max(self.max_x, x + 1);
-        self.min_y = min(self.min_y, y - 1);
-        self.max_y = max(self.max_y, y + 1);
-        self.min_diag13 = min(self.min_diag13, x + y - 2);
-        self.max_diag13 = max(self.max_diag13, x + y + 2);
-        self.min_diag24 = min(self.min_diag24, x - y - 2);
-        self.max_diag24 = max(self.max_diag24, x - y + 2);
+        self.min_x = min(self.min_x, x);
+        self.max_x = max(self.max_x, x);
+        self.min_y = min(self.min_y, y);
+        self.max_y = max(self.max_y, y);
+        self.min_diag13 = min(self.min_diag13, x + y);
+        self.max_diag13 = max(self.max_diag13, x + y);
+        self.min_diag24 = min(self.min_diag24, x - y);
+        self.max_diag24 = max(self.max_diag24, x - y);
     }
 
     fn are_unbounded(&self) -> bool {
@@ -100,6 +100,7 @@ fn evolve(
     input: &Grid<CellPos>,
     max_occupied: usize,
     sees_occupied: impl Fn(&Grid<CellPos>, usize, usize) -> usize,
+    update_bounds: impl Fn(usize, usize, &mut Bounds)
 ) -> usize {
     let mut grid = input.clone();
     let mut new_grid = grid.clone();
@@ -115,11 +116,11 @@ fn evolve(
 
                 new_grid[(x, y)] = match grid[(x, y)] {
                     CellPos::EmptySeat if n_occupied == 0 => {
-                        new_bounds.add_point((x, y));
+                        update_bounds(x, y, &mut new_bounds);
                         CellPos::OccupiedSeat
                     }
                     CellPos::OccupiedSeat if n_occupied >= max_occupied => {
-                        new_bounds.add_point((x, y));
+                        update_bounds(x, y, &mut new_bounds);
                         CellPos::EmptySeat
                     }
                     cellpos => cellpos,
@@ -138,13 +139,24 @@ fn evolve(
 }
 
 pub fn part1(input: &Input) -> usize {
-    evolve(input, 4, |grid, x, y| {
-        let x = x as isize;
-        let y = y as isize;
-        [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].iter()
-            .filter(|&(dx, dy)| grid.get(((x + dx) as usize, (y + dy) as usize)) == Some(&CellPos::OccupiedSeat))
-            .count()
-    })
+    evolve(
+        input, 
+        4, 
+        |grid, x, y| {
+            let x = x as isize;
+            let y = y as isize;
+            [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].iter()
+                .filter(|&(dx, dy)| grid.get(((x + dx) as usize, (y + dy) as usize)) == Some(&CellPos::OccupiedSeat))
+                .count()
+        }, 
+        |x, y, bounds| {
+            let x = x as isize;
+            let y = y as isize;
+            for &(dx, dy) in &[(-1, -1), (1, -1), (-1, 1), (1, 1)] {
+                bounds.add_point(((x + dx) as usize, (y + dy) as usize))
+            }
+        }
+    )
 }
 
 pub fn part2(input: &Input) -> usize {
@@ -175,9 +187,18 @@ pub fn part2(input: &Input) -> usize {
         })
         .collect::<Vec<_>>();
 
-    evolve(grid, 5, |grid, x, y| {
-        neighbours[x + y * grid.width].iter()
-            .filter(|&&pos| grid[pos] == CellPos::OccupiedSeat)
-            .count()
-    })
+    evolve(
+        grid, 
+        5, 
+        |grid, x, y| {
+            neighbours[x + y * grid.width].iter()
+                .filter(|&&pos| grid[pos] == CellPos::OccupiedSeat)
+                .count()
+        }, 
+        |x, y, bounds| {
+            for &(nx, ny) in &neighbours[x + y * grid.width] {
+                bounds.add_point((nx, ny));
+            }
+        }
+    )
 }
