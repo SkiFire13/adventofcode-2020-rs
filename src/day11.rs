@@ -99,7 +99,7 @@ impl Bounds {
 fn evolve(
     input: &Grid<CellPos>,
     max_occupied: usize,
-    sees_occupied: impl Fn(&Grid<CellPos>, isize, isize, isize, isize) -> bool,
+    sees_occupied: impl Fn(&Grid<CellPos>, usize, usize) -> usize,
 ) -> usize {
     let mut grid = input.clone();
     let mut new_grid = grid.clone();
@@ -111,10 +111,7 @@ fn evolve(
 
         bounds.for_each(|x, y| {
             if grid[(x, y)] != CellPos::Floor {
-                let n_occupied = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
-                    .iter()
-                    .map(|&(dx, dy)| sees_occupied(&grid, x as isize, y as isize, dx, dy) as usize)
-                    .sum::<usize>();
+                let n_occupied = sees_occupied(&grid, x, y);
 
                 new_grid[(x, y)] = match grid[(x, y)] {
                     CellPos::EmptySeat if n_occupied == 0 => {
@@ -141,19 +138,46 @@ fn evolve(
 }
 
 pub fn part1(input: &Input) -> usize {
-    evolve(input, 4, |grid, x, y, dx, dy| {
-        grid.get(((x + dx) as usize, (y + dy) as usize)) == Some(&CellPos::OccupiedSeat)
+    evolve(input, 4, |grid, x, y| {
+        let x = x as isize;
+        let y = y as isize;
+        [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].iter()
+            .filter(|&(dx, dy)| grid.get(((x + dx) as usize, (y + dy) as usize)) == Some(&CellPos::OccupiedSeat))
+            .count()
     })
 }
 
 pub fn part2(input: &Input) -> usize {
-    evolve(input, 5, |grid, x, y, dx, dy| {
-        let mut x = x + dx;
-        let mut y = y + dy;
-        while let Some(CellPos::Floor) = grid.iget((x, y)) {
-            x += dx;
-            y += dy;
-        }
-        grid.iget((x, y)) == Some(&CellPos::OccupiedSeat)
+    let grid = input;
+    let width = grid.width;
+
+    let neighbours = grid.vec
+        .iter()
+        .enumerate()
+        .map(|(idx, &cell)| {
+            let x = (idx % width) as isize;
+            let y = (idx / width) as isize;
+            match cell {
+                CellPos::Floor => Default::default(),
+                _ => [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+                    .iter()
+                    .filter_map(|&(dx, dy)| {
+                        let mut nx = x + dx;
+                        let mut ny = y + dy;
+                        while let Some(CellPos::Floor) = grid.iget((nx, ny)) {
+                            nx += dx;
+                            ny += dy;
+                        }
+                        grid.iget((nx, ny)).map(|_| (nx as usize, ny as usize))
+                    })
+                    .collect::<ArrayVec<[_; 8]>>()
+            }
+        })
+        .collect::<Vec<_>>();
+
+    evolve(grid, 5, |grid, x, y| {
+        neighbours[x + y * grid.width].iter()
+            .filter(|&&pos| grid[pos] == CellPos::OccupiedSeat)
+            .count()
     })
 }
