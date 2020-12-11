@@ -29,73 +29,108 @@ pub fn input_generator(input: &str) -> Input {
     Grid { vec, width }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct Bounds {
+    min_x: isize,
+    max_x: isize,
+    min_y: isize,
+    max_y: isize,
+    min_diag13: isize,
+    max_diag13: isize,
+    min_diag24: isize,
+    max_diag24: isize,
+}
+
+impl Bounds {
+    const UNBOUNDED: Bounds = Self {
+        min_x: isize::MAX,
+        max_x: isize::MIN,
+        min_y: isize::MAX,
+        max_y: isize::MIN,
+        min_diag13: isize::MAX,
+        max_diag13: isize::MIN,
+        min_diag24: isize::MAX,
+        max_diag24: isize::MIN,
+    };
+
+    fn initial_for_grid(grid: &Grid<CellPos>) -> Self {
+        Self {
+            min_x: 1,
+            max_x: (grid.width - 1) as isize,
+            min_y: 1,
+            max_y: (grid.height() - 1) as isize ,
+            min_diag13: 0,
+            max_diag13: (grid.width + grid.height() - 2) as isize,
+            min_diag24: (0 - grid.height() + 1) as isize,
+            max_diag24: (grid.width - 1 - 0) as isize, 
+        }
+    }
+
+    fn add_point(&mut self, (x, y): (usize, usize)) {
+        let (x, y) = (x as isize, y as isize);
+        self.min_x = min(self.min_x, x - 1);
+        self.max_x = max(self.max_x, x + 1);
+        self.min_y = min(self.min_y, y - 1);
+        self.max_y = max(self.max_y, y + 1);
+        self.min_diag13 = min(self.min_diag13, x + y - 2);
+        self.max_diag13 = max(self.max_diag13, x + y + 2);
+        self.min_diag24 = min(self.min_diag24, x - y - 2);
+        self.max_diag24 = max(self.max_diag24, x - y + 2);
+    }
+
+    fn are_unbounded(&self) -> bool {
+        self.min_x == isize::MAX
+    }
+
+    fn for_each(&self, mut f: impl FnMut(usize, usize)) {
+        let mut y = self.min_y;
+        while y <= self.max_y {
+            let mut x = max(self.min_x, max(self.min_diag13 - y, self.min_diag24 + y));
+            let end_x = min(self.max_x, min(self.max_diag13 - y, self.max_diag24 + y));
+            while x <= end_x {
+                f(x as usize, y as usize);
+                x += 1;
+            }
+            y += 1;
+        }
+    }
+}
+
 fn evolve(
     input: &Grid<CellPos>,
     max_occupied: usize,
-    mut sees_occupied: impl FnMut(&Grid<CellPos>, isize, isize, isize, isize) -> bool,
+    sees_occupied: impl Fn(&Grid<CellPos>, isize, isize, isize, isize) -> bool,
 ) -> usize {
     let mut grid = input.clone();
     let mut new_grid = grid.clone();
 
-    let mut min_x = 1;
-    let mut max_x = grid.width;
-    let mut min_y = 1;
-    let mut max_y = grid.height();
+    let mut bounds = Bounds::initial_for_grid(&grid);
 
-    let mut changed = true;
+    while !bounds.are_unbounded() {
+        let mut new_bounds = Bounds::UNBOUNDED;
 
-    while changed {
-        changed = false;
-        let mut new_min_x = usize::MAX;
-        let mut new_max_x = 0;
-        let mut new_min_y = usize::MAX;
-        let mut new_max_y = 0;
-
-        for y in min_y..max_y - 1 {
-            for x in min_x..max_x - 1 {
-                if grid[(x, y)] != CellPos::Floor {
-                    let n_occupied = [
-                        (-1, -1),
-                        (0, -1),
-                        (1, -1),
-                        (-1, 0),
-                        (1, 0),
-                        (-1, 1),
-                        (0, 1),
-                        (1, 1),
-                    ]
+        bounds.for_each(|x, y| {
+            if grid[(x, y)] != CellPos::Floor {
+                let n_occupied = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
                     .iter()
-                    .copied()
-                    .filter(|&(dx, dy)| sees_occupied(&grid, x as isize, y as isize, dx, dy))
-                    .count();
+                    .map(|&(dx, dy)| sees_occupied(&grid, x as isize, y as isize, dx, dy) as usize)
+                    .sum::<usize>();
 
-                    new_grid[(x, y)] = match grid[(x, y)] {
-                        CellPos::EmptySeat if n_occupied == 0 => {
-                            changed = true;
-                            new_min_x = min(new_min_x, x - 1);
-                            new_max_x = max(new_max_x, x + 2);
-                            new_min_y = min(new_min_y, y - 1);
-                            new_max_y = max(new_max_y, y + 2);
-                            CellPos::OccupiedSeat
-                        }
-                        CellPos::OccupiedSeat if n_occupied >= max_occupied => {
-                            changed = true;
-                            new_min_x = min(new_min_x, x - 1);
-                            new_max_x = max(new_max_x, x + 2);
-                            new_min_y = min(new_min_y, y - 1);
-                            new_max_y = max(new_max_y, y + 2);
-                            CellPos::EmptySeat
-                        }
-                        cellpos => cellpos,
+                new_grid[(x, y)] = match grid[(x, y)] {
+                    CellPos::EmptySeat if n_occupied == 0 => {
+                        new_bounds.add_point((x, y));
+                        CellPos::OccupiedSeat
                     }
+                    CellPos::OccupiedSeat if n_occupied >= max_occupied => {
+                        new_bounds.add_point((x, y));
+                        CellPos::EmptySeat
+                    }
+                    cellpos => cellpos,
                 }
             }
-        }
+        });
 
-        min_x = new_min_x;
-        max_x = new_max_x;
-        min_y = new_min_y;
-        max_y = new_max_y;
+        bounds = new_bounds;
         mem::swap(&mut grid, &mut new_grid);
     }
 
