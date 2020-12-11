@@ -25,7 +25,7 @@ pub fn input_generator(input: &str) -> Input {
         vec.push(CellPos::Floor);
     }
     vec.extend(iter::repeat(CellPos::Floor).take(width));
-    
+
     Grid { vec, width }
 }
 
@@ -37,12 +37,22 @@ fn evolve(
     let mut grid = input.clone();
     let mut new_grid = grid.clone();
 
+    let mut min_x = 1;
+    let mut max_x = grid.width;
+    let mut min_y = 1;
+    let mut max_y = grid.height();
+
     let mut changed = true;
+
     while changed {
         changed = false;
+        let mut new_min_x = usize::MAX;
+        let mut new_max_x = 0;
+        let mut new_min_y = usize::MAX;
+        let mut new_max_y = 0;
 
-        for y in 1..grid.height() - 1 {
-            for x in 1..grid.width - 1 {
+        for y in min_y..max_y - 1 {
+            for x in min_x..max_x - 1 {
                 if grid[(x, y)] != CellPos::Floor {
                     let n_occupied = [
                         (-1, -1),
@@ -62,10 +72,18 @@ fn evolve(
                     new_grid[(x, y)] = match grid[(x, y)] {
                         CellPos::EmptySeat if n_occupied == 0 => {
                             changed = true;
+                            new_min_x = min(new_min_x, x - 1);
+                            new_max_x = max(new_max_x, x + 2);
+                            new_min_y = min(new_min_y, y - 1);
+                            new_max_y = max(new_max_y, y + 2);
                             CellPos::OccupiedSeat
                         }
                         CellPos::OccupiedSeat if n_occupied >= max_occupied => {
                             changed = true;
+                            new_min_x = min(new_min_x, x - 1);
+                            new_max_x = max(new_max_x, x + 2);
+                            new_min_y = min(new_min_y, y - 1);
+                            new_max_y = max(new_max_y, y + 2);
                             CellPos::EmptySeat
                         }
                         cellpos => cellpos,
@@ -74,6 +92,10 @@ fn evolve(
             }
         }
 
+        min_x = new_min_x;
+        max_x = new_max_x;
+        min_y = new_min_y;
+        max_y = new_max_y;
         mem::swap(&mut grid, &mut new_grid);
     }
 
