@@ -12,7 +12,7 @@ aoc_helper::main!(2020 =>
     day9,
     day10,
     day11,
-    // day12,
+    day12,
     // day13,
     // day14,
     // day15,
