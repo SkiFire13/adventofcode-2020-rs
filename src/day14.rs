@@ -19,6 +19,7 @@ pub fn input_generator(input: &str) -> Input {
             _ => Instr::Mask(
                 line[7..]
                     .chars()
+                    .rev()
                     .map(|c| match c {
                         '0' => 0,
                         '1' => 1,
@@ -41,13 +42,14 @@ pub fn part1(input: &Input) -> u64 {
         match instr {
             Instr::Mask(new_mask) => mask = new_mask,
             Instr::Mem(addr, val) => {
-                let new_val = (0..36).fold(0, |acc, pos| {
-                    let bit = match mask[35 - pos] {
+                let new_val = mask
+                    .iter()
+                    .enumerate()
+                    .map(|(pos, &bit)| match bit {
                         2 => val & (1 << pos),
                         i => (i as u64) << pos,
-                    };
-                    acc | bit
-                });
+                    })
+                    .fold(0, |acc, mask| acc | mask);
                 memory.insert(addr, new_val);
             }
         }
@@ -65,20 +67,20 @@ pub fn part2(input: &Input) -> u64 {
             Instr::Mask(new_mask) => mask = new_mask,
             Instr::Mem(addr, val) => {
                 let xs = mask.iter().filter(|&&b| b == 2).count();
-                for i in 0..(1 << xs) {
-                    let mut xpos = 0;
-                    let addr = (0..36).fold(0, |acc, pos| {
-                        let bit = match mask[35 - pos] {
-                            0 => addr & (1 << pos),
-                            1 => 1 << pos,
-                            _ => {
-                                let v = (i & (1 << xpos)) >> xpos;
-                                xpos += 1;
-                                v << pos
+                for mut i in 0..(1 << xs) {
+                    let addr = mask
+                        .iter()
+                        .enumerate()
+                        .fold(addr, |mut acc, (pos, &bit)| {
+                            if bit != 2 {
+                                acc |= (bit as usize) << pos;
+                            } else {
+                                acc &= !(1 << pos);
+                                acc |= (i & 1) << pos;
+                                i >>= 1;
                             }
-                        };
-                        acc | bit
-                    });
+                            acc
+                        });
                     memory.insert(addr, val);
                 }
             }
