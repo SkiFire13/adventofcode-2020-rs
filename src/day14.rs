@@ -13,8 +13,8 @@ pub fn input_generator(input: &str) -> Input {
         .lines()
         .map(|line| match &line[..3] {
             "mem" => {
-                let (addr, val) = line[4..].split("] = ").collect_tuple().unwrap();
-                Instr::Mem(addr.parse().unwrap(), val.parse().unwrap())
+                let (addr, val) = line[4..].split("] = ").collect_tuple().expect("Invalid input");
+                Instr::Mem(addr.parse().expect("Invalid input"), val.parse().expect("Invalid input"))
             }
             _ => Instr::Mask(
                 line[7..]
@@ -24,11 +24,12 @@ pub fn input_generator(input: &str) -> Input {
                         '0' => 0,
                         '1' => 1,
                         'X' => 2,
-                        _ => panic!(),
+                        _ => panic!("Invalid input"),
                     })
-                    .collect::<Vec<u8>>()
+                    .collect::<ArrayVec<[u8; 40]>>()
+                    .as_slice()
                     .try_into()
-                    .unwrap(),
+                    .expect("Invalid input")
             ),
         })
         .collect()
