@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input = Vec<usize>;
+type Input = Vec<u32>;
 
 pub fn input_generator(input: &str) -> Input {
     input
@@ -9,33 +9,28 @@ pub fn input_generator(input: &str) -> Input {
         .collect()
 }
 
-fn run(starting: &[usize], nth: usize) -> usize {
-    let mut history = vec![usize::MAX; nth];
+fn run(starting: &[u32], nth: u32) -> u32 {
+    let mut history = vec![u32::MAX; nth as usize];
     starting
         .iter()
-        .copied()
         .enumerate()
-        .for_each(|(pos, n)| history[n] = pos);
+        .for_each(|(pos, &n)| history[n as usize] = pos as u32);
 
     let mut last = starting.last().copied().expect("Input is empty");
-    let mut prev_spoken = usize::MAX;
+    let mut prev_spoken = u32::MAX;
 
-    for i in starting.len()..nth {
-        if prev_spoken == usize::MAX {
-            last = 0;
-        } else {
-            last = i - 1 - prev_spoken;
-        }
-        prev_spoken = mem::replace(&mut history[last], i);
+    for i in starting.len() as u32..nth {
+        last = (i - 1).saturating_sub(prev_spoken);
+        prev_spoken = mem::replace(&mut history[last as usize], i);
     }
 
     last
 }
 
-pub fn part1(input: &Input) -> usize {
+pub fn part1(input: &Input) -> u32 {
     run(input, 2020)
 }
 
-pub fn part2(input: &Input) -> usize {
+pub fn part2(input: &Input) -> u32 {
     run(input, 30000000)
 }
