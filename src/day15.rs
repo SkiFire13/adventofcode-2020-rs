@@ -10,13 +10,13 @@ pub fn input_generator(input: &str) -> Input {
 }
 
 fn run(starting: &[usize], nth: usize) -> usize {
-    let mut history = starting
+    let mut history = vec![usize::MAX; nth];
+    starting
         .iter()
         .copied()
         .enumerate()
-        .map(|(pos, n)| (n, pos))
-        .collect::<HashMap<_, _>>();
-    history.reserve(nth / 5);
+        .for_each(|(pos, n)| history[n] = pos);
+
     let mut last = starting.last().copied().expect("Input is empty");
     let mut prev_spoken = usize::MAX;
 
@@ -26,7 +26,7 @@ fn run(starting: &[usize], nth: usize) -> usize {
         } else {
             last = i - 1 - prev_spoken;
         }
-        prev_spoken = history.insert(last, i).unwrap_or(usize::MAX);
+        prev_spoken = mem::replace(&mut history[last], i);
     }
 
     last
