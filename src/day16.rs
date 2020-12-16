@@ -74,32 +74,67 @@ pub fn part2(input: &Input) -> u64 {
         })
     });
 
-    let mut association_candidates = vec![(0..rules.len()).collect_vec(); rules.len()];
+    let mut candidates = vec![true; rules.len() * rules.len()];
+    let mut v_lens = vec![rules.len(); rules.len()];
+    let mut r_lens = vec![rules.len(); rules.len()];
 
     for nearbyticket in nearbytickets.iter() {
         for (vpos, &v) in nearbyticket.iter().enumerate() {
-            let mut rpos = 0;
-            let pos_candidates = &mut association_candidates[vpos];
-            while rpos < pos_candidates.len() {
-                let (_, r1s, r1e, r2s, r2e) = rules[pos_candidates[rpos]];
-                if (r1s <= v && v <= r1e) || (r2s <= v && v <= r2e) {
-                    rpos += 1;
-                } else {
-                    pos_candidates.swap_remove(rpos);
+            for (rpos, &(_, r1s, r1e, r2s, r2e)) in rules.iter().enumerate() {
+                if !((r1s <= v && v <= r1e) || (r2s <= v && v <= r2e)) {
+                    if mem::replace(&mut candidates[vpos + rules.len() * rpos], false) {
+                        v_lens[vpos] -= 1;
+                        r_lens[rpos] -= 1;
+                    }
                 }
             }
         }
     }
 
-    let mut associations = HashMap::with_capacity(rules.len());
-    while associations.len() < rules.len() {
-        for (pos, candidates) in association_candidates.iter().enumerate() {
-            if candidates.len() == 1 {
-                associations.insert(candidates[0], pos);
+    let mut associations = vec![usize::MAX; rules.len()];
+    let mut associations_len = 0;
+    let mut found = true;
+    while found && associations_len < rules.len() {
+        found = false;
+        for v in 0..rules.len() {
+            if v_lens[v] == 1 {
+                found = true;
+                let r = candidates
+                    .iter()
+                    .skip(v)
+                    .step_by(rules.len())
+                    .position(|&b| b)
+                    .unwrap();
+                let prev = mem::replace(&mut associations[r], v);
+                assert_eq!(prev, usize::MAX, "Can't solve");
+                associations_len += 1;
+                for v in 0..rules.len() {
+                    if mem::replace(&mut candidates[v + r * rules.len()], false) {
+                        v_lens[v] -= 1;
+                        r_lens[r] -= 1;
+                    }
+                }
             }
         }
-        for candidates in association_candidates.iter_mut() {
-            candidates.retain(|candidate| !associations.contains_key(candidate));
+        for r in 0..rules.len() {
+            if r_lens[r] == 1 {
+                found = true;
+                let v = candidates
+                    .iter()
+                    .skip(r * rules.len())
+                    .take(rules.len())
+                    .position(|&b| b)
+                    .unwrap();
+                let prev = mem::replace(&mut associations[r], v);
+                assert_eq!(prev, usize::MAX, "Can't solve");
+                associations_len += 1;
+                for r in 0..rules.len() {
+                    if mem::replace(&mut candidates[v + r * rules.len()], false) {
+                        v_lens[v] -= 1;
+                        r_lens[r] -= 1;
+                    }
+                }
+            }
         }
     }
 
@@ -108,6 +143,11 @@ pub fn part2(input: &Input) -> u64 {
         .enumerate()
         .map(|(pos, (name, _, _, _, _))| (pos, name))
         .filter(|(_, name)| name.starts_with("departure"))
-        .map(|(pos, _)| myticket[associations[&pos]])
+        .map(|(pos, _)| {
+            myticket
+                .get(associations[pos])
+                .copied()
+                .expect("Can't solve")
+        })
         .product()
 }
