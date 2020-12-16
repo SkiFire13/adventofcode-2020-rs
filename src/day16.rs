@@ -15,19 +15,20 @@ pub fn input_generator(input: &str) -> Input {
     let rules = rules
         .lines()
         .map(|line| {
-            let (name, rest) = line.split(": ").collect_tuple().expect("Invalid input");
-            let (r1, r2) = rest.split(" or ").collect_tuple().expect("Invalid input");
-            let (r1s, r1e) = r1.split('-').collect_tuple().expect("Invalid input");
-            let (r2s, r2e) = r2.split('-').collect_tuple().expect("Invalid input");
-            (
+            let (name, rest) = line.split(": ").collect_tuple()?;
+            let (r1, r2) = rest.split(" or ").collect_tuple()?;
+            let (r1s, r1e) = r1.split('-').collect_tuple()?;
+            let (r2s, r2e) = r2.split('-').collect_tuple()?;
+            Some((
                 name,
-                r1s.parse().expect("Invalid input"),
-                r1e.parse().expect("Invalid input"),
-                r2s.parse().expect("Invalid input"),
-                r2e.parse().expect("Invalid input"),
-            )
+                r1s.parse().ok()?,
+                r1e.parse().ok()?,
+                r2s.parse().ok()?,
+                r2e.parse().ok()?,
+            ))
         })
-        .collect();
+        .collect::<Option<_>>()
+        .expect("Invalid input");
     let myticket = myticket
         .split(',')
         .map(|v| v.parse().expect("Invalid input"))
