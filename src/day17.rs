@@ -23,14 +23,21 @@ where
     Neighbours: Iterator<Item = Point>,
 {
     let mut space = create_storage();
-    let mut tmp = space.clone();
+    let mut adj = vec![0u8; space.len()];
 
     for i in 0..6 {
+        adj.iter_mut().for_each(|s| *s = 0);
         for p in bounds(i + 1) {
-            let near_actives = neighbours(p).filter(|&p| space[index(p)]).count();
-            tmp[index(p)] = near_actives == 3 || (space[index(p)] && near_actives == 2);
+            if space[index(p)] {
+                for n in neighbours(p) {
+                    adj[index(n)] += 1;
+                }
+            }
         }
-        mem::swap(&mut tmp, &mut space);
+        for p in bounds(i + 1) {
+            let near_actives = adj[index(p)];
+            space[index(p)] = near_actives == 3 || (space[index(p)] && near_actives == 2);
+        }
     }
 
     space.iter().filter(|&&b| b).count()
