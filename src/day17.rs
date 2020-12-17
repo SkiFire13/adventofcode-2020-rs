@@ -1,74 +1,107 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input = Vec<(i8, i8)>;
+use itertools::iproduct;
+type Input = Grid<bool>;
 
 pub fn input_generator(input: &str) -> Input {
-    input.lines().enumerate()
-        .flat_map(|(y, line)| line.chars().enumerate().filter_map(move |(x, c)| match c {
-            '#' => Some((x as i8, y as i8)),
-            '.' => None,
-            _ => panic!("Invalid input"),
-        }))
-        .collect()
+    Grid::from_input_chars(input, |c, _, _| match c {
+        '#' => true,
+        '.' => false,
+        _ => panic!("Invalid input"),
+    })
 }
 
-fn solve<Point: Hash + Eq + Copy + Send + Sync, Neighbours: Iterator<Item=Point>>(
-    input: &[(i8, i8)],
-    mapper: fn((i8, i8)) -> Point,
-    neighbours: fn(Point) -> Neighbours
-) -> usize {
-    let mut actives = input.iter().copied().map(mapper).collect::<FxHashSet<_>>();
-    let mut new_actives = FxHashSet::default();
+fn solve<Point, Actives, Neighbours>(
+    create_storage: impl Fn() -> Vec<bool>,
+    index: impl Fn(Point) -> usize,
+    bounds: impl Fn(i8) -> Actives,
+    neighbours: fn(Point) -> Neighbours,
+) -> usize
+where
+    Point: Copy + std::fmt::Debug,
+    Actives: Iterator<Item = Point>,
+    Neighbours: Iterator<Item = Point>,
+{
+    let mut space = create_storage();
+    let mut tmp = space.clone();
 
-    for _ in 0..6 {
-        new_actives.clear();
-        new_actives.par_extend(
-            actives
-                .par_iter()
-                .flat_map_iter(|&p| neighbours(p).chain(iter::once(p)))
-                .filter(|&p| {
-                    let near_actives = neighbours(p)
-                        .filter(|&p| actives.contains(&p))
-                        .count();
-                    let was_active = actives.contains(&p);
-                    (was_active && (near_actives == 2 || near_actives == 3)) || (!was_active && near_actives == 3)
-                })
-        );
-        mem::swap(&mut new_actives, &mut actives);
+    for i in 0..6 {
+        for p in bounds(i + 1) {
+            let near_actives = neighbours(p).filter(|&p| space[index(p)]).count();
+            tmp[index(p)] = near_actives == 3 || (space[index(p)] && near_actives == 2);
+        }
+        mem::swap(&mut tmp, &mut space);
     }
 
-    actives.len()
+    space.iter().filter(|&&b| b).count()
 }
 
 pub fn part1(input: &Input) -> usize {
-    fn neighbours3d((x, y, z): (i8, i8, i8)) -> impl Iterator<Item = (i8, i8, i8)> {
-        (-1..2)
-            .flat_map(|dx| (-1..2).map(move |dy| (dx, dy)))
-            .flat_map(|(dx, dy)| (-1..2).map(move |dz| (dx, dy, dz)))
-            .filter(|&(dx, dy, dz)| !(dx == 0 && dy == 0 && dz == 0))
-            .map(move |(dx, dy, dz)| (x + dx, y + dy, z + dz))
-    }
+    let dims = [input.width, input.height(), 1];
+    let dims_prod = |n| dims.iter().map(|&d| d + 2 * 7).take(n).product::<usize>();
+
+    let index = |(x, y, z)| {
+        (x + 7) as usize * dims_prod(0)
+            + (y + 7) as usize * dims_prod(1)
+            + (z + 7) as usize * dims_prod(2)
+    };
 
     solve(
-        input,
-        |(x, y)| (x, y, 0),
-        neighbours3d
+        || {
+            let mut storage = vec![false; dims_prod(usize::MAX)];
+            for (x, y) in iproduct!(0..input.width, 0..input.height()) {
+                storage[index((x as i8, y as i8, 0))] = input[(x, y)];
+            }
+            storage
+        },
+        index,
+        |r| {
+            iproduct!(
+                -r..r + dims[0] as i8,
+                -r..r + dims[1] as i8,
+                -r..r + dims[2] as i8
+            )
+        },
+        |(x, y, z)| {
+            iproduct!(-1..2, -1..2, -1..2)
+                .filter(|&d| d != (0, 0, 0))
+                .map(move |(dx, dy, dz)| (x + dx, y + dy, z + dz))
+        },
     )
 }
 
 pub fn part2(input: &Input) -> usize {
-    fn neighbours4d((x, y, z, w): (i8, i8, i8, i8)) -> impl Iterator<Item = (i8, i8, i8, i8)> {
-        (-1..2)
-            .flat_map(|dx| (-1..2).map(move |dy| (dx, dy)))
-            .flat_map(|(dx, dy)| (-1..2).map(move |dz| (dx, dy, dz)))
-            .flat_map(|(dx, dy, dz)| (-1..2).map(move |dw| (dx, dy, dz, dw)))
-            .filter(|&(dx, dy, dz, dw)| !(dx == 0 && dy == 0 && dz == 0 && dw == 0))
-            .map(move |(dx, dy, dz, dw)| (x + dx, y + dy, z + dz, w + dw))
-    }
+    let dims = [input.width, input.height(), 1, 1];
+    let dims_prod = |n| dims.iter().map(|&d| d + 2 * 7).take(n).product::<usize>();
+
+    let index = |(x, y, z, w)| {
+        (x + 7) as usize * dims_prod(0)
+            + (y + 7) as usize * dims_prod(1)
+            + (z + 7) as usize * dims_prod(2)
+            + (w + 7) as usize * dims_prod(3)
+    };
 
     solve(
-        input,
-        |(x, y)| (x, y, 0, 0),
-        neighbours4d
+        || {
+            let mut storage = vec![false; dims_prod(usize::MAX)];
+            for (x, y) in iproduct!(0..input.width, 0..input.height()) {
+                storage[index((x as i8, y as i8, 0, 0))] = input[(x, y)];
+            }
+            storage
+        },
+        index,
+        |r| {
+            iproduct!(
+                -r..r + dims[0] as i8,
+                -r..r + dims[1] as i8,
+                -r..r + dims[2] as i8,
+                -r..r + dims[3] as i8
+            )
+        },
+        |(x, y, z, w)| {
+            iproduct!(-1..2, -1..2, -1..2, -1..2)
+                .filter(|&d| d != (0, 0, 0, 0))
+                .map(move |(dx, dy, dz, dw)| (x + dx, y + dy, z + dz, w + dw))
+        },
     )
 }
