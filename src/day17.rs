@@ -7,7 +7,7 @@ pub fn input_generator(input: &str) -> Input {
         .flat_map(|(y, line)| line.chars().enumerate().filter_map(move |(x, c)| match c {
             '#' => Some((x as i8, y as i8)),
             '.' => None,
-            _ => panic!(),
+            _ => panic!("Invalid input"),
         }))
         .collect()
 }
