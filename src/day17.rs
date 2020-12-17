@@ -12,7 +12,7 @@ pub fn input_generator(input: &str) -> Input {
         .collect()
 }
 
-fn solve<Point: Hash + Eq + Copy, Neighbours: Iterator<Item=Point>>(
+fn solve<Point: Hash + Eq + Copy + Send + Sync, Neighbours: Iterator<Item=Point>>(
     input: &[(isize, isize)],
     mapper: fn((isize, isize)) -> Point,
     neighbours: fn(Point) -> Neighbours
@@ -22,10 +22,10 @@ fn solve<Point: Hash + Eq + Copy, Neighbours: Iterator<Item=Point>>(
 
     for _ in 0..6 {
         new_actives.clear();
-        new_actives.extend(
+        new_actives.par_extend(
             actives
-                .iter()
-                .flat_map(|&p| neighbours(p).chain(iter::once(p)))
+                .par_iter()
+                .flat_map_iter(|&p| neighbours(p).chain(iter::once(p)))
                 .filter(|&p| {
                     let near_actives = neighbours(p)
                         .filter(|&p| actives.contains(&p))
