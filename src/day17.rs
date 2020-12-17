@@ -17,8 +17,8 @@ fn solve<Point: Hash + Eq + Copy + Send + Sync, Neighbours: Iterator<Item=Point>
     mapper: fn((i8, i8)) -> Point,
     neighbours: fn(Point) -> Neighbours
 ) -> usize {
-    let mut actives = input.iter().copied().map(mapper).collect::<HashSet<_>>();
-    let mut new_actives = HashSet::new();
+    let mut actives = input.iter().copied().map(mapper).collect::<FxHashSet<_>>();
+    let mut new_actives = FxHashSet::default();
 
     for _ in 0..6 {
         new_actives.clear();
