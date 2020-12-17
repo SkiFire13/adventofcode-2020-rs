@@ -1,11 +1,11 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input = Vec<(isize, isize)>;
+type Input = Vec<(i8, i8)>;
 
 pub fn input_generator(input: &str) -> Input {
     input.lines().enumerate()
         .flat_map(|(y, line)| line.chars().enumerate().filter_map(move |(x, c)| match c {
-            '#' => Some((x as isize, y as isize)),
+            '#' => Some((x as i8, y as i8)),
             '.' => None,
             _ => panic!(),
         }))
@@ -13,8 +13,8 @@ pub fn input_generator(input: &str) -> Input {
 }
 
 fn solve<Point: Hash + Eq + Copy + Send + Sync, Neighbours: Iterator<Item=Point>>(
-    input: &[(isize, isize)],
-    mapper: fn((isize, isize)) -> Point,
+    input: &[(i8, i8)],
+    mapper: fn((i8, i8)) -> Point,
     neighbours: fn(Point) -> Neighbours
 ) -> usize {
     let mut actives = input.iter().copied().map(mapper).collect::<HashSet<_>>();
@@ -41,7 +41,7 @@ fn solve<Point: Hash + Eq + Copy + Send + Sync, Neighbours: Iterator<Item=Point>
 }
 
 pub fn part1(input: &Input) -> usize {
-    fn neighbours3d((x, y, z): (isize, isize, isize)) -> impl Iterator<Item = (isize, isize, isize)> {
+    fn neighbours3d((x, y, z): (i8, i8, i8)) -> impl Iterator<Item = (i8, i8, i8)> {
         (-1..2)
             .flat_map(|dx| (-1..2).map(move |dy| (dx, dy)))
             .flat_map(|(dx, dy)| (-1..2).map(move |dz| (dx, dy, dz)))
@@ -57,7 +57,7 @@ pub fn part1(input: &Input) -> usize {
 }
 
 pub fn part2(input: &Input) -> usize {
-    fn neighbours4d((x, y, z, w): (isize, isize, isize, isize)) -> impl Iterator<Item = (isize, isize, isize, isize)> {
+    fn neighbours4d((x, y, z, w): (i8, i8, i8, i8)) -> impl Iterator<Item = (i8, i8, i8, i8)> {
         (-1..2)
             .flat_map(|dx| (-1..2).map(move |dy| (dx, dy)))
             .flat_map(|(dx, dy)| (-1..2).map(move |dz| (dx, dy, dz)))
