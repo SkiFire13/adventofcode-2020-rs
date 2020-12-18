@@ -1,115 +1,89 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input = Vec<Vec<Token>>;
+type Input = Vec<Token>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub enum Token {
-    Num(i64),
-    Op(Op),
+    Num(u64),
+    OpPlus,
+    OpTimes,
     ParOpen,
     ParClose,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Op {
-    Plus,
-    Times,
 }
 
 pub fn input_generator(input: &str) -> Input {
     input
         .lines()
-        .map(|line| {
-            let mut tokens = Vec::new();
+        .flat_map(|line| {
             let mut chars = line.chars().peekable();
-            while let Some(c) = chars.next() {
-                tokens.push(match c {
-                    '+' => Token::Op(Op::Plus),
-                    '*' => Token::Op(Op::Times),
-                    '(' => Token::ParOpen,
-                    ')' => Token::ParClose,
-                    ' ' => continue,
-                    c @ '0'..='9' => {
-                        let mut acc = (c as u8 - b'0') as i64;
-                        while let Some(&c @ '0'..='9') = chars.peek() {
-                            chars.next();
-                            acc = 10 * acc + (c as u8 - b'0') as i64;
-                        }
-                        Token::Num(acc)
-                    }
-                    _ => panic!("Invalid input"),
-                });
-            }
-            tokens
+            iter::once(Token::OpPlus)
+                .chain(iter::once(Token::ParOpen))
+                .chain(iter::from_fn(move || {
+                    while let Some(' ') = chars.peek() { chars.next(); }
+                    Some(match chars.next()? {
+                        '+' => Token::OpPlus,
+                        '*' => Token::OpTimes,
+                        '(' => Token::ParOpen,
+                        ')' => Token::ParClose,
+                        c @ '0'..='9' => Token::Num(
+                            chars
+                                .peeking_take_while(|&c| matches!(c, '0'..='9'))
+                                .map(|c| c as u64 - '0' as u64)
+                                .fold(c as u64 - '0' as u64, |acc, d| 10 * acc + d),
+                        ),
+                        _ => panic!("Invalid input"),
+                    })
+                }))
+                .chain(iter::once(Token::ParClose))
         })
+        .skip(1)
         .collect()
 }
 
-pub fn part1(input: &Input) -> i64 {
-    fn eval(expr: &mut impl Iterator<Item = Token>) -> i64 {
-        let mut acc = match expr.next() {
-            Some(Token::Num(n)) => n,
-            Some(Token::ParOpen) => eval(expr),
-            _ => panic!("Invalid token"),
-        };
-
-        loop {
-            let op = match expr.next() {
-                Some(Token::Op(Op::Plus)) => |a, b| a + b,
-                Some(Token::Op(Op::Times)) => |a, b| a * b,
-                Some(Token::ParClose) | None => return acc,
-                _ => panic!("Invalid token"),
-            };
-            let n = match expr.next() {
-                Some(Token::Num(n)) => n,
-                Some(Token::ParOpen) => eval(expr),
-                _ => panic!("Invalid token"),
-            };
-            acc = op(acc, n);
-        }
+fn next_value<I: Iterator<Item = Token>>(tokens: &mut I, eval: fn(&mut I) -> u64) -> u64 {
+    match tokens.next() {
+        Some(Token::Num(n)) => n,
+        Some(Token::ParOpen) => eval(tokens),
+        _ => panic!("Invalid token"),
     }
-
-    let exprs = input;
-    exprs
-        .iter()
-        .map(|expr| eval(&mut expr.iter().copied()))
-        .sum()
 }
 
-pub fn part2(input: &Input) -> i64 {
-    fn eval(expr: &mut impl Iterator<Item = Token>) -> i64 {
-        let mut stack = vec![match expr.next() {
-            Some(Token::Num(n)) => n,
-            Some(Token::ParOpen) => eval(expr),
-            _ => panic!(),
-        }];
+pub fn part1(input: &Input) -> u64 {
+    fn eval(tokens: &mut impl Iterator<Item = Token>) -> u64 {
+        let mut acc = next_value(tokens, eval);
 
         loop {
-            match expr.next() {
-                Some(Token::Op(Op::Plus)) => {
-                    let n = match expr.next() {
-                        Some(Token::Num(n)) => n,
-                        Some(Token::ParOpen) => eval(expr),
-                        _ => panic!("Invalid token"),
-                    };
-                    *stack.last_mut().unwrap() += n;
-                }
-                Some(Token::Op(Op::Times)) => {
-                    stack.push(match expr.next() {
-                        Some(Token::Num(n)) => n,
-                        Some(Token::ParOpen) => eval(expr),
-                        _ => panic!("Invalid token"),
-                    });
-                }
-                Some(Token::ParClose) | None => return stack.into_iter().product(),
+            match tokens.next() {
+                Some(Token::OpPlus) => acc += next_value(tokens, eval),
+                Some(Token::OpTimes) => acc *= next_value(tokens, eval),
+                Some(Token::ParClose) | None => return acc,
+                _ => panic!("Invalid token"),
+            }
+        }
+    }
+
+    let tokens = input;
+    eval(&mut tokens.iter().copied())
+}
+
+pub fn part2(input: &Input) -> u64 {
+    fn eval(tokens: &mut impl Iterator<Item = Token>) -> u64 {
+        let mut acc = 1;
+        let mut curr = next_value(tokens, eval);
+
+        loop {
+            match tokens.next() {
+                Some(Token::OpPlus) => curr += next_value(tokens, eval),
+                Some(Token::OpTimes) => {
+                    acc *= curr;
+                    curr = next_value(tokens, eval);
+                },
+                Some(Token::ParClose) | None => return acc * curr,
                 _ => panic!("Invalid token"),
             };
         }
     }
 
-    let exprs = input;
-    exprs
-        .iter()
-        .map(|expr| eval(&mut expr.iter().copied()))
-        .sum()
+    let tokens = input;
+    eval(&mut tokens.iter().copied())
 }
