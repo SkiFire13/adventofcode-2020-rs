@@ -70,17 +70,17 @@ impl<'a, T> ChunkStack<'a, T> {
     }
 }
 
-fn match_rule<'i>(
-    s: &'i str,
-    mut next: ChunkStack<u8>,
-    rules: &[Rule],
-) -> Option<&'i str> {
+fn match_rule(s: &str, mut next: ChunkStack<u8>, rules: &[Rule]) -> bool {
     match next.pop().map(|&r| &rules[r as usize]) {
-        Some(Rule::Literal(lit)) => s.strip_prefix(lit).and_then(|s| match_rule(s, next, rules)),
+        Some(Rule::Literal(lit)) => s
+            .strip_prefix(lit)
+            .map(|s| match_rule(s, next, rules))
+            .unwrap_or(false),
         Some(Rule::Seq(seq)) => match_rule(s, next.append(seq), rules),
-        Some(Rule::Or(seq1, seq2)) => match_rule(s, next.append(seq1), rules)
-            .or_else(|| match_rule(s, next.append(seq2), rules)),
-        None => Some(s).filter(|&s| s == ""),
+        Some(Rule::Or(seq1, seq2)) => {
+            match_rule(s, next.append(seq1), rules) || match_rule(s, next.append(seq2), rules)
+        }
+        None => s == "",
     }
 }
 
@@ -89,7 +89,7 @@ pub fn part1(input: &Input) -> usize {
 
     tests
         .iter()
-        .filter(|s| match_rule(s, INITIAL_STACK, &rules) == Some(""))
+        .filter(|s| match_rule(s, INITIAL_STACK, &rules))
         .count()
 }
 
@@ -108,6 +108,6 @@ pub fn part2(input: &Input) -> usize {
 
     tests
         .iter()
-        .filter(|s| match_rule(s, INITIAL_STACK, &rules) == Some(""))
+        .filter(|s| match_rule(s, INITIAL_STACK, &rules))
         .count()
 }
