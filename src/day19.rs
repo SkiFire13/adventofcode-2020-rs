@@ -1,14 +1,21 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input<'a> = (HashMap<u32, Rule<'a>>, Vec<&'a str>);
+type Input<'a> = (HashMap<u8, Rule<'a>>, Vec<&'a str>);
 
 #[derive(Clone, Debug)]
 pub enum Rule<'a> {
     Literal(&'a str),
-    Or(ArrayVec<[u32; 3]>, ArrayVec<[u32; 3]>),
+    Seq(ArrayVec<[u8; 3]>),
+    Or(ArrayVec<[u8; 3]>, ArrayVec<[u8; 3]>),
 }
 
 pub fn input_generator(input: &str) -> Input {
+    fn parse_rule_seq(rule: &str) -> ArrayVec<[u8; 3]> {
+        rule.split_ascii_whitespace()
+            .map(|r| r.parse().expect("Invalid input"))
+            .collect()
+    }
+
     let (rules, tests) = input.split("\n\n").collect_tuple().expect("Invalid input");
     let rules = rules
         .lines()
@@ -22,16 +29,10 @@ pub fn input_generator(input: &str) -> Input {
                         .strip_suffix('"')
                         .expect("Invalid input"),
                 )
+            } else if let Some((rs1, rs2)) = rule.split(" | ").collect_tuple() {
+                Rule::Or(parse_rule_seq(rs1), parse_rule_seq(rs2))
             } else {
-                let (rs1, rs2) = rule.split(" | ").collect_tuple().unwrap_or((rule, ""));
-                Rule::Or(
-                    rs1.split_ascii_whitespace()
-                        .map(|r| r.parse().expect("Invalid input"))
-                        .collect(),
-                    rs2.split_ascii_whitespace()
-                        .map(|r| r.parse().expect("Invalid input"))
-                        .collect(),
-                )
+                Rule::Seq(parse_rule_seq(rule))
             };
             (n, rule)
         })
@@ -40,35 +41,48 @@ pub fn input_generator(input: &str) -> Input {
     (rules, tests)
 }
 
-fn match_rule<'i>(s: &'i str, rule: &Rule, rules: &HashMap<u32, Rule>) -> bool {
-    let mut queue = Vec::new();
-    queue.push((s, vec![rule]));
+struct ChunkStack<'a, T> {
+    chunk: &'a [T],
+    next: Option<&'a ChunkStack<'a, T>>,
+}
 
-    while let Some((s, mut rules_stack)) = queue.pop() {
-        if let Some(rule) = rules_stack.pop() {
-            match rule {
-                Rule::Literal(lit) => {
-                    if let Some(s) = s.strip_prefix(*lit) {
-                        queue.push((s, rules_stack));
-                    }
-                }
-                Rule::Or(rs1, rs2) => {
-                    if !rs2.is_empty() {
-                        let mut rules_stack2 = rules_stack.clone();
-                        rules_stack2.extend(rs2.iter().map(|r| &rules[r]).rev());
-                        queue.push((s, rules_stack2));
-                    }
-                    let mut rules_stack1 = rules_stack;
-                    rules_stack1.extend(rs1.iter().map(|r| &rules[r]).rev());
-                    queue.push((s, rules_stack1));
-                }
+const INITIAL_STACK: ChunkStack<'static, u8> = ChunkStack {
+    chunk: &[0],
+    next: None,
+};
+
+impl<'a, T> ChunkStack<'a, T> {
+    fn append(&'a self, chunk: &'a [T]) -> Self {
+        let next = Some(self);
+        Self { chunk, next }
+    }
+    fn pop(&mut self) -> Option<&'a T> {
+        loop {
+            if let Some((elem, rest)) = self.chunk.split_first() {
+                self.chunk = rest;
+                return Some(elem);
+            } else if let Some(next) = self.next {
+                self.chunk = next.chunk;
+                self.next = next.next;
+            } else {
+                return None;
             }
-        } else if s == "" {
-            return true;
         }
     }
+}
 
-    false
+fn match_rule<'i>(
+    s: &'i str,
+    mut next: ChunkStack<u8>,
+    rules: &HashMap<u8, Rule>,
+) -> Option<&'i str> {
+    match next.pop().map(|r| &rules[r]) {
+        Some(Rule::Literal(lit)) => s.strip_prefix(lit).and_then(|s| match_rule(s, next, rules)),
+        Some(Rule::Seq(seq)) => match_rule(s, next.append(seq), rules),
+        Some(Rule::Or(seq1, seq2)) => match_rule(s, next.append(seq1), rules)
+            .or_else(|| match_rule(s, next.append(seq2), rules)),
+        None => Some(s).filter(|&s| s == ""),
+    }
 }
 
 pub fn part1(input: &Input) -> usize {
@@ -76,7 +90,7 @@ pub fn part1(input: &Input) -> usize {
 
     tests
         .iter()
-        .filter(|s| match_rule(s, &rules[&0], &rules))
+        .filter(|s| match_rule(s, INITIAL_STACK, &rules) == Some(""))
         .count()
 }
 
@@ -101,6 +115,6 @@ pub fn part2(input: &Input) -> usize {
 
     tests
         .iter()
-        .filter(|s| match_rule(s, &rules[&0], &rules))
+        .filter(|s| match_rule(s, INITIAL_STACK, &rules) == Some(""))
         .count()
 }
