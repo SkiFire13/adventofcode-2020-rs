@@ -7,10 +7,8 @@ pub fn input_generator(input: &str) -> Input {
     input
         .split("\n\n")
         .map(|tile| {
-            let (id, grid) = tile.splitn(2, "\n").collect_tuple().unwrap();
-            let id = id.strip_prefix("Tile ").unwrap();
-            let id = id.strip_suffix(":").unwrap();
-            let id = id.parse().unwrap();
+            let (id, grid) = tile.splitn(2, "\n").collect_tuple().expect("Invalid input");
+            let id = id[5..9].parse().expect("Invalid input");
             let grid = Grid::from_input_chars(grid, |c, _, _| c == '#');
             (id, grid)
         })
@@ -30,12 +28,9 @@ pub fn part1(input: &Input) -> u64 {
         ])
         .into_iter()
         .map(|i| i.map(|p| grid[p]).collect::<ArrayVec<[bool; 10]>>())
-        .for_each(|edge1| {
-            let mut edge2 = edge1.clone();
-            edge2.reverse();
-            edges.insert(edge2, id);
-            if let Some(old) = edges.insert(edge1, id) {
-                assert!(old != id);
+        .for_each(|edge| {
+            edges.insert(edge.iter().copied().rev().collect(), id);
+            if let Some(old) = edges.insert(edge, id) {
                 *adj.entry(id).or_insert(0) += 1;
                 *adj.entry(old).or_insert(0) += 1;
             }
@@ -49,23 +44,19 @@ pub fn part1(input: &Input) -> u64 {
 }
 
 fn rotate_grid(grid: &mut Grid<bool>) {
-    assert!(grid.width == grid.height());
-    for (x, y) in iproduct!(0..grid.width / 2, 0..grid.height() / 2) {
-        grid.vec
-            .swap(x + y * grid.width, grid.width - 1 - y + x * grid.width);
-        grid.vec.swap(
-            x + y * grid.width,
-            grid.width - 1 - x + (grid.width - 1 - y) * grid.width,
-        );
-        grid.vec
-            .swap(x + y * grid.width, y + (grid.width - 1 - x) * grid.width);
+    let size = grid.width;
+    for (x, y) in iproduct!(0..size / 2, 0..size / 2) {
+        let base = x + y * size;
+        grid.vec.swap(base, size - 1 - y + x * size);
+        grid.vec.swap(base, size - 1 - x + (size - 1 - y) * size);
+        grid.vec.swap(base, y + (size - 1 - x) * size);
     }
 }
 
 fn flip_grid(grid: &mut Grid<bool>) {
-    for (x, y) in iproduct!(0..grid.width / 2, 0..grid.height()) {
-        grid.vec
-            .swap(grid.width - 1 - x + y * grid.width, x + y * grid.width);
+    let size = grid.width;
+    for (x, y) in iproduct!(0..size / 2, 0..size) {
+        grid.vec.swap(size - 1 - x + y * size, x + y * size);
     }
 }
 
@@ -121,23 +112,18 @@ pub fn part2(input: &Input) -> usize {
             let prev_grid = &pos_grid_map[&prev_pos];
             let mut grid = input[&next].clone();
             for i in 0..8 {
-                let dpos = if adj_vert(&prev_grid, &grid) {
-                    (0, 1)
-                } else if adj_vert(&grid, &prev_grid) {
-                    (0, -1)
-                } else if adj_horiz(&prev_grid, &grid) {
-                    (1, 0)
-                } else if adj_horiz(&grid, &prev_grid) {
-                    (-1, 0)
-                } else {
-                    if i == 8 {
-                        panic!()
+                let dpos = match () {
+                    _ if adj_vert(&prev_grid, &grid) => (0, 1),
+                    _ if adj_vert(&grid, &prev_grid) => (0, -1),
+                    _ if adj_horiz(&prev_grid, &grid) => (1, 0),
+                    _ if adj_horiz(&grid, &prev_grid) => (-1, 0),
+                    _ => {
+                        rotate_grid(&mut grid);
+                        if i == 3 {
+                            flip_grid(&mut grid);
+                        }
+                        continue;
                     }
-                    rotate_grid(&mut grid);
-                    if i == 3 {
-                        flip_grid(&mut grid);
-                    }
-                    continue;
                 };
 
                 let new_pos = (prev_pos.0 + dpos.0, prev_pos.1 + dpos.1);
@@ -184,32 +170,26 @@ pub fn part2(input: &Input) -> usize {
         .filter(|&(x, y)| monster[x + y * 20] == b'#')
         .collect::<Vec<_>>();
 
-    'outer: for i in 0..8 {
+    let mut sea_monsters_points = HashSet::new();
+
+    for i in 0..8 {
+        let mut found = false;
         for (x, y) in iproduct!(0..final_grid.width - 19, 0..final_grid.height() - 2) {
-            let contains_monster = monster_relpos
+            if monster_relpos
                 .iter()
-                .all(|&(dx, dy)| final_grid[(x + dx, y + dy)]);
-            if contains_monster {
-                break 'outer;
+                .copied()
+                .all(|(dx, dy)| final_grid[(x + dx, y + dy)])
+            {
+                found = true;
+                sea_monsters_points.extend(monster_relpos.iter().map(|&(dx, dy)| (x + dx, y + dy)));
             }
         }
-        if i == 8 {
-            panic!()
+        if found {
+            break;
         }
         rotate_grid(&mut final_grid);
         if i == 3 {
             flip_grid(&mut final_grid);
-        }
-    }
-
-    let mut sea_monsters_points = HashSet::new();
-    for (x, y) in iproduct!(0..final_grid.width - 19, 0..final_grid.height() - 2) {
-        let contains_monster = monster_relpos
-            .iter()
-            .copied()
-            .all(|(dx, dy)| final_grid[(x + dx, y + dy)]);
-        if contains_monster {
-            sea_monsters_points.extend(monster_relpos.iter().map(|&(dx, dy)| (x + dx, y + dy)));
         }
     }
 
