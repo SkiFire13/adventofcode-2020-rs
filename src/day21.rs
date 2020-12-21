@@ -18,14 +18,21 @@ pub fn input_generator(input: &str) -> Input {
         .collect()
 }
 
-pub fn part1(input: &Input) -> usize {
+fn find_all_ingrs_and_allgs<'a>(input: &Input<'a>) -> (HashSet<&'a str>, HashSet<&'a str>) {
     let mut all_ingrs = HashSet::new();
     let mut all_allgs = HashSet::new();
     for (ingrs, allgs) in input {
         all_ingrs.extend(ingrs.iter().copied());
         all_allgs.extend(allgs.iter().copied());
     }
+    (all_ingrs, all_allgs)
+}
 
+fn find_ingr_allgs_candidates<'a>(
+    input: &Input<'a>,
+    all_ingrs: &HashSet<&'a str>,
+    all_allgs: &HashSet<&'a str>,
+) -> HashMap<&'a str, HashSet<&'a str>> {
     let mut allg_ingrs = all_allgs
         .iter()
         .copied()
@@ -43,10 +50,16 @@ pub fn part1(input: &Input) -> usize {
         }
     }
 
+    allg_ingrs
+}
+
+pub fn part1(input: &Input) -> usize {
+    let (all_ingrs, all_allgs) = find_all_ingrs_and_allgs(input);
+    let allg_ingrs = find_ingr_allgs_candidates(input, &all_ingrs, &all_allgs);
+
     let mut ingr_allgs = all_ingrs
         .iter()
-        .copied()
-        .map(|ingrs| (ingrs, all_allgs.clone()))
+        .map(|&ingrs| (ingrs, all_allgs.clone()))
         .collect::<HashMap<_, _>>();
     for (ingr, candidate_allgs) in ingr_allgs.iter_mut() {
         candidate_allgs.retain(|allg| allg_ingrs[allg].contains(ingr))
@@ -60,29 +73,8 @@ pub fn part1(input: &Input) -> usize {
 }
 
 pub fn part2(input: &Input) -> String {
-    let mut all_ingrs = HashSet::new();
-    let mut all_allgs = HashSet::new();
-    for (ingrs, allgs) in input {
-        all_ingrs.extend(ingrs.iter().copied());
-        all_allgs.extend(allgs.iter().copied());
-    }
-
-    let mut allg_ingrs = all_allgs
-        .iter()
-        .copied()
-        .map(|ingrs| (ingrs, all_ingrs.clone()))
-        .collect::<HashMap<_, _>>();
-    for (ingrs, allgs) in input {
-        for &allg in allgs {
-            let candidate_ingrs = &allg_ingrs[&allg];
-            let new_candidate = ingrs
-                .iter()
-                .copied()
-                .filter(|ingr| candidate_ingrs.contains(ingr))
-                .collect();
-            allg_ingrs.insert(allg, new_candidate);
-        }
-    }
+    let (all_ingrs, all_allgs) = find_all_ingrs_and_allgs(input);
+    let mut allg_ingrs = find_ingr_allgs_candidates(input, &all_ingrs, &all_allgs);
 
     let mut setted_ingrs = HashSet::new();
     let mut allg_ingr_sorted = BTreeMap::new();
