@@ -39,12 +39,18 @@ pub fn part1(input: &Input) -> u32 {
     score(if !first.is_empty() { first } else { second })
 }
 
-fn recursive_game(first: &mut VecDeque<u8>, second: &mut VecDeque<u8>) -> bool {
-    let mut seen = FxHashSet::<(ArrayVec<[u8; 50]>, ArrayVec<[u8; 50]>)>::default();
-
+fn recursive_game(
+    first: &mut VecDeque<u8>,
+    second: &mut VecDeque<u8>,
+    setpool: &mut Vec<FxHashSet<(ArrayVec<[u8; 50]>, ArrayVec<[u8; 50]>)>>,
+) -> bool {
+    let mut seen = setpool.pop().unwrap_or_else(FxHashSet::default);
     while let (Some(&f), Some(&s)) = (first.front(), second.front()) {
-        if !seen.insert((first.iter().copied().collect(), second.iter().copied().collect())) {
-            return true;
+        if !seen.insert((
+            first.iter().copied().collect(),
+            second.iter().copied().collect(),
+        )) {
+            break;
         }
 
         first.pop_front();
@@ -54,6 +60,7 @@ fn recursive_game(first: &mut VecDeque<u8>, second: &mut VecDeque<u8>) -> bool {
             recursive_game(
                 &mut first.iter().copied().take(f as usize).collect(),
                 &mut second.iter().copied().take(s as usize).collect(),
+                setpool,
             )
         } else {
             f > s
@@ -68,6 +75,9 @@ fn recursive_game(first: &mut VecDeque<u8>, second: &mut VecDeque<u8>) -> bool {
         }
     }
 
+    seen.clear();
+    setpool.push(seen);
+
     !first.is_empty()
 }
 
@@ -76,7 +86,7 @@ pub fn part2(input: &Input) -> u32 {
     let mut first = first.iter().copied().collect::<VecDeque<_>>();
     let mut second = second.iter().copied().collect::<VecDeque<_>>();
 
-    let winner = if recursive_game(&mut first, &mut second) {
+    let winner = if recursive_game(&mut first, &mut second, &mut Vec::new()) {
         first
     } else {
         second
