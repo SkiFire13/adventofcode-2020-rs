@@ -39,17 +39,26 @@ pub fn part1(input: &Input) -> u32 {
     score(if !first.is_empty() { first } else { second })
 }
 
+type EncodedDeck = (u128, u128);
+fn encode(deck: &VecDeque<u8>) -> EncodedDeck {
+    let mut iter = deck.iter().copied();
+    let n1 = (&mut iter)
+        .take(25)
+        .fold(0, |acc, n| acc << 5 | (n as u128));
+    let n2 = (&mut iter)
+        .take(25)
+        .fold(0, |acc, n| acc << 5 | (n as u128));
+    (n1, n2)
+}
+
 fn recursive_game(
     first: &mut VecDeque<u8>,
     second: &mut VecDeque<u8>,
-    setpool: &mut Vec<FxHashSet<(ArrayVec<[u8; 50]>, ArrayVec<[u8; 50]>)>>,
+    setpool: &mut Vec<FxHashSet<(EncodedDeck, EncodedDeck)>>,
 ) -> bool {
     let mut seen = setpool.pop().unwrap_or_else(FxHashSet::default);
     while let (Some(&f), Some(&s)) = (first.front(), second.front()) {
-        if !seen.insert((
-            first.iter().copied().collect(),
-            second.iter().copied().collect(),
-        )) {
+        if !seen.insert((encode(&first), encode(&second))) {
             break;
         }
 
