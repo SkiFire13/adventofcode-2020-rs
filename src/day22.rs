@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use super::prelude::*;
-type Input = (Vec<u32>, Vec<u32>);
+type Input = (Vec<u8>, Vec<u8>);
 
 pub fn input_generator(input: &str) -> Input {
     let (first, second) = input.splitn(2, "\n\n").collect_tuple().expect("Invalid input");
@@ -9,6 +9,14 @@ pub fn input_generator(input: &str) -> Input {
     let first = first.lines().map(|line| line.parse().expect("Invalid input")).collect();
     let second = second.lines().map(|line| line.parse().expect("Invalid input")).collect();
     (first, second)
+}
+
+fn score(deck: VecDeque<u8>) -> u32 {
+    deck.into_iter()
+        .rev()
+        .enumerate()
+        .map(|(pos, n)| (pos + 1) as u32 * n as u32)
+        .sum()
 }
 
 pub fn part1(input: &Input) -> u32 {
@@ -28,41 +36,35 @@ pub fn part1(input: &Input) -> u32 {
         }
     }
 
-    first
-        .into_iter()
-        .chain(second)
-        .rev()
-        .enumerate()
-        .map(|(pos, n)| (pos + 1) as u32 * n)
-        .sum()
+    score(if !first.is_empty() { first } else { second })
 }
 
-fn recursive_game(first: &mut VecDeque<u32>, second: &mut VecDeque<u32>) -> bool {
-    let mut seen = HashSet::new();
+fn recursive_game(first: &mut VecDeque<u8>, second: &mut VecDeque<u8>) -> bool {
+    let mut seen = FxHashSet::<(ArrayVec<[u8; 50]>, ArrayVec<[u8; 50]>)>::default();
 
     while let (Some(&f), Some(&s)) = (first.front(), second.front()) {
-        if seen.insert((first.clone(), second.clone())) {
-            first.pop_front();
-            second.pop_front();
-
-            let f_win = if first.len() >= f as usize && second.len() >= s as usize {
-                recursive_game(
-                    &mut first.iter().copied().take(f as usize).collect(),
-                    &mut second.iter().copied().take(s as usize).collect(),
-                )
-            } else {
-                f > s
-            };
-
-            if f_win {
-                first.push_back(f);
-                first.push_back(s);
-            } else {
-                second.push_back(s);
-                second.push_back(f);
-            }
-        } else {
+        if !seen.insert((first.iter().copied().collect(), second.iter().copied().collect())) {
             return true;
+        }
+
+        first.pop_front();
+        second.pop_front();
+
+        let f_win = if first.len() >= f as usize && second.len() >= s as usize {
+            recursive_game(
+                &mut first.iter().copied().take(f as usize).collect(),
+                &mut second.iter().copied().take(s as usize).collect(),
+            )
+        } else {
+            f > s
+        };
+
+        if f_win {
+            first.push_back(f);
+            first.push_back(s);
+        } else {
+            second.push_back(s);
+            second.push_back(f);
         }
     }
 
@@ -80,10 +82,5 @@ pub fn part2(input: &Input) -> u32 {
         second
     };
 
-    winner
-        .into_iter()
-        .rev()
-        .enumerate()
-        .map(|(pos, n)| (pos + 1) as u32 * n)
-        .sum()
+    score(winner)
 }
