@@ -35,65 +35,49 @@ pub fn part1(input: &Input) -> u32 {
     cups[1..].iter().fold(0, |acc, &d| 10 * acc + (d as u32))
 }
 
-#[derive(Debug)]
-struct Node {
-    val: u32,
-    next: Option<usize>,
-}
-
 struct IndexLinkedList {
-    indexmap: Vec<usize>,
-    nodes: Vec<Node>,
+    nodes: Vec<u32>,
     front: usize,
     back: usize,
 }
 
 impl IndexLinkedList {
     fn pop_front(&mut self) -> u32 {
-        let val = self.nodes[self.front].val;
-        self.front = self.nodes[self.front].next.take().unwrap();
+        let val = self.front as u32;
+        self.front = mem::take(&mut self.nodes[self.front]) as usize;
         val
     }
     fn push_back(&mut self, val: u32) {
-        let node_idx = self.indexmap[(val-1) as usize];
-        self.nodes[self.back].next = Some(node_idx);
-        self.back = node_idx;
+        self.nodes[self.back] = val;
+        self.back = val as usize;
     }
     fn pop_after(&mut self, val: u32) -> u32 {
-        let node_idx = self.indexmap[(val-1) as usize];
-        let next_idx = self.nodes[node_idx].next.take().unwrap();
-        let new_next_idx = self.nodes[next_idx].next.take();
-        self.nodes[node_idx].next = new_next_idx;
-        self.nodes[next_idx].val
+        let next = mem::take(&mut self.nodes[val as usize]);
+        self.nodes[val as usize] = mem::take(&mut self.nodes[next as usize]);
+        next
     }
     fn push_after(&mut self, val: u32, after: u32) {
-        let node_idx = self.indexmap[(val-1) as usize];
-        let after_idx = self.indexmap[(after-1) as usize];
-        self.nodes[node_idx].next = self.nodes[after_idx].next;
-        self.nodes[after_idx].next = Some(node_idx);
+        self.nodes[val as usize] = mem::replace(&mut self.nodes[after as usize], val);
     }
 }
 
 pub fn part2(input: &Input) -> u64 {
-    let mut nodes = Vec::new();
-    for i in input.iter().map(|&d| d as u32).chain(10..1_000_000+1) {
-        nodes.push(Node {
-            val: i as u32,
-            next: Some(nodes.len()+1)
-        });
-    }
-    nodes[1_000_000-1].next = None;
+    let mut nodes = vec![0; 1_000_000 + 1];
 
-    let mut positions = (0..1_000_000).collect_vec();
-    for i in 0..9 {
-        positions[i] = input.iter().position(|&d| d == i as u8 + 1).unwrap();
+    let mut prev = 0;
+    for &d in input {
+        nodes[prev] = d as u32;
+        prev = d as usize;
+    }
+    for i in 10..1_000_000 + 1 {
+        nodes[prev] = i;
+        prev = i as usize;
     }
 
     let mut list = IndexLinkedList {
-        indexmap: positions,
         nodes,
-        front: 0,
-        back: 1_000_000 - 1,
+        front: input[0] as usize,
+        back: 1_000_000,
     };
 
     for _ in 0..10_000_000 {
