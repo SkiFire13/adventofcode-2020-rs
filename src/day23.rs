@@ -11,30 +11,6 @@ pub fn input_generator(input: &str) -> Input {
         .expect("Invalid input")
 }
 
-pub fn part1(input: &Input) -> u32 {
-    let mut cups = *input;
-    for _ in 0..100 {
-        let current_cup = cups[0];
-        let next_cups = [
-            cups[1],
-            cups[2],
-            cups[3],
-        ];
-        let mut dest_cup = current_cup - 1;
-        if dest_cup == 0 { dest_cup = cups.iter().copied().max().unwrap(); }
-        while next_cups.contains(&dest_cup) {
-            dest_cup -= 1;
-            if dest_cup == 0 { dest_cup = cups.iter().copied().max().unwrap(); }
-        }
-        let dest_cup_pos = cups.iter().position(|&cup| cup == dest_cup).unwrap();
-        cups[1..=dest_cup_pos].rotate_left(3);
-        cups.rotate_left(1);
-    }
-    let pos1 = cups.iter().position(|&cup| cup == 1).unwrap();
-    cups.rotate_left(pos1);
-    cups[1..].iter().fold(0, |acc, &d| 10 * acc + (d as u32))
-}
-
 struct IndexLinkedList {
     nodes: Vec<u32>,
     front: usize,
@@ -61,6 +37,56 @@ impl IndexLinkedList {
     }
 }
 
+fn solve(list: &mut IndexLinkedList, max: u32, cycles: usize) {
+    for _ in 0..cycles {
+        let current_cup = list.pop_front();
+        let next_cups = [
+            list.pop_front(),
+            list.pop_front(),
+            list.pop_front(),
+        ];
+
+        let mut dest_cup = current_cup - 1;
+        if dest_cup == 0 { dest_cup = max; }
+        while next_cups.contains(&dest_cup) {
+            dest_cup -= 1;
+            if dest_cup == 0 { dest_cup = max; }
+        }
+
+        list.push_back(current_cup);
+        list.push_after(next_cups[2], dest_cup);
+        list.push_after(next_cups[1], dest_cup);
+        list.push_after(next_cups[0], dest_cup);
+    }
+}
+
+pub fn part1(input: &Input) -> u32 {
+    let mut nodes = vec![0; 9 + 1];
+
+    let mut prev = 0;
+    for &d in input {
+        nodes[prev] = d as u32;
+        prev = d as usize;
+    }
+
+    let mut list = IndexLinkedList {
+        nodes,
+        front: input[0] as usize,
+        back: input[8] as usize,
+    };
+
+    solve(&mut list, 9, 100);
+
+    loop {
+        match list.pop_front() {
+            1 => break,
+            n => list.push_back(n),
+        }
+    }
+
+    (0..8).map(|_| list.pop_front()).fold(0, |acc, d| 10 * acc + d)
+}
+
 pub fn part2(input: &Input) -> u64 {
     let mut nodes = vec![0; 1_000_000 + 1];
 
@@ -80,26 +106,7 @@ pub fn part2(input: &Input) -> u64 {
         back: 1_000_000,
     };
 
-    for _ in 0..10_000_000 {
-        let current_cup = list.pop_front();
-        let next_cups = [
-            list.pop_front(),
-            list.pop_front(),
-            list.pop_front(),
-        ];
-
-        let mut dest_cup = current_cup - 1;
-        if dest_cup == 0 { dest_cup = 1_000_000; }
-        while next_cups.contains(&dest_cup) {
-            dest_cup -= 1;
-            if dest_cup == 0 { dest_cup = 1_000_000; }
-        }
-
-        list.push_back(current_cup);
-        list.push_after(next_cups[2], dest_cup);
-        list.push_after(next_cups[1], dest_cup);
-        list.push_after(next_cups[0], dest_cup);
-    }
+    solve(&mut list, 1_000_000, 10_000_000);
 
     list.pop_after(1) as u64 * list.pop_after(1) as u64
 }
