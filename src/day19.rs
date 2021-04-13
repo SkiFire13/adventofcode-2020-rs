@@ -60,11 +60,10 @@ impl<'a, T> ChunkStack<'a, T> {
             if let Some((elem, rest)) = self.chunk.split_first() {
                 self.chunk = rest;
                 return Some(elem);
-            } else if let Some(next) = self.next {
+            } else {
+                let next = self.next?;
                 self.chunk = next.chunk;
                 self.next = next.next;
-            } else {
-                return None;
             }
         }
     }
@@ -74,8 +73,7 @@ fn match_rule(s: &str, mut next: ChunkStack<u8>, rules: &[Rule]) -> bool {
     match next.pop().map(|&r| &rules[r as usize]) {
         Some(Rule::Literal(lit)) => s
             .strip_prefix(lit)
-            .map(|s| match_rule(s, next, rules))
-            .unwrap_or(false),
+            .map_or(false, |s| match_rule(s, next, rules)),
         Some(Rule::Seq(seq)) => match_rule(s, next.append(seq), rules),
         Some(Rule::Or(seq1, seq2)) => {
             match_rule(s, next.append(seq1), rules) || match_rule(s, next.append(seq2), rules)
